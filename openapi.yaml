@@ -1,0 +1,408 @@
+
+openapi: 3.0.3
+
+info:
+  title: Lost and Found Management System API
+  version: 1.0.0
+  description: >
+    Initial REST API contract for the SENG 321
+    Lost and Found Management System.
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development server
+
+tags:
+  - name: Authentication
+  - name: Items
+  - name: Claims
+
+paths:
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a new user
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Authenticate a user
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /items:
+    get:
+      tags: [Items]
+      summary: Search and list lost or found items
+      operationId: listItems
+      parameters:
+        - name: type
+          in: query
+          description: Filter by report type
+          schema:
+            type: string
+            enum: [lost, found]
+        - name: category
+          in: query
+          description: Filter by category
+          schema:
+            type: string
+        - name: keyword
+          in: query
+          description: Search item descriptions
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Items retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Item'
+
+    post:
+      tags: [Items]
+      summary: Create a lost or found item report
+      operationId: createItem
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateItem'
+      responses:
+        '201':
+          description: Item report created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /items/{itemId}:
+    get:
+      tags: [Items]
+      summary: Get details of an item
+      operationId: getItem
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '200':
+          description: Item found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Items]
+      summary: Update an item status
+      operationId: updateItemStatus
+      description: >
+        Authorized report owners or administrators
+        may update an item's status.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [open, claimed, closed]
+      responses:
+        '200':
+          description: Item status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /claims:
+    post:
+      tags: [Claims]
+      summary: Submit an ownership claim
+      operationId: createClaim
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateClaim'
+      responses:
+        '201':
+          description: Claim submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Claim'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /claims/{claimId}:
+    patch:
+      tags: [Claims]
+      summary: Review an ownership claim
+      operationId: reviewClaim
+      description: >
+        Only administrators may approve
+        or reject ownership claims.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: claimId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [approved, rejected]
+      responses:
+        '200':
+          description: Claim reviewed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Claim'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: integer
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Jane Doe
+        email:
+          type: string
+          format: email
+          example: jane@example.com
+        role:
+          type: string
+          enum: [student, staff, admin]
+
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    LoginResponse:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          example: example-jwt-token
+
+    CreateItem:
+      type: object
+      required:
+        - title
+        - description
+        - type
+        - category
+      properties:
+        title:
+          type: string
+          example: Lost wallet
+        description:
+          type: string
+          example: Black wallet lost near library
+        type:
+          type: string
+          enum: [lost, found]
+        category:
+          type: string
+          example: Personal belongings
+        location:
+          type: string
+          example: University library
+
+    Item:
+      allOf:
+        - $ref: '#/components/schemas/CreateItem'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 1
+            status:
+              type: string
+              enum: [open, claimed, closed]
+            createdAt:
+              type: string
+              format: date-time
+
+    CreateClaim:
+      type: object
+      required: [itemId, description]
+      properties:
+        itemId:
+          type: integer
+          example: 1
+        description:
+          type: string
+          example: This wallet belongs to me.
+
+    Claim:
+      allOf:
+        - $ref: '#/components/schemas/CreateClaim'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 10
+            status:
+              type: string
+              enum: [pending, approved, rejected]
+            createdAt:
+              type: string
+              format: date-time
+
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          example: Invalid request
+
+  responses:
+    BadRequest:
+      description: Invalid request data
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Authentication failed or required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Requested resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
